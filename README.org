@@ -3,10 +3,10 @@
 * RayPortal 
   Another retro raycaster written in Haskell.
  
-  * Will support arbitrary angles between walls (not just 90 degree angles) 
-  * Will use a "portal" system to decrease the number of walls to intersect a ray against
+  + Will support arbitrary angles between walls (not just 90 degree angles) 
+  + Will use a "portal" system to decrease the number of walls to intersect a ray against
  
 * TODOs 
   
-  * Implement the Portal system
+  + Implement the Portal system
   
