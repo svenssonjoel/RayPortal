@@ -101,8 +101,8 @@ castRay world pos angle column = Slice top bot texValue texCol (min 1.0 (lightRa
 wallIntersect ray (Wall line id)  = (intersect ray line, line)  
 wallIntersect ray (Portal line _) = (intersect ray line, line)
     
-distanceAlongLine p (Line s e) 
-  = distance p e                                    
+distanceAlongLine p (Line s _) 
+  = distance p s                                    
                                     
 castRay2 :: World -> Float -> Ray  -> (Float,Int32,Int32)
 castRay2 world accDist ray = (d,1,offset) -- cheat a bit for now  
@@ -266,7 +266,7 @@ eventLoop screen wallTextures(up,down,left,right) (r,x,y) = do
   let pf = surfaceGetPixelFormat screen
   
   
-  pix <- mapRGB pf 0 0 0  
+  pix <- mapRGB pf 0 32 64  
   
   
   -- Clear screen
