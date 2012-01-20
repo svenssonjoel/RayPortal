@@ -18,19 +18,22 @@ import Data.Maybe
 import CExtras
 import MathExtras
 
+import Debug.Trace
 ----------------------------------------------------------------------------
 -- A world of Walls
 data World = World {worldWalls :: [Wall]} 
 
 ----------------------------------------------------------------------------
 -- A wall is either a portal or a visible wall
-data Wall = Portal Line World -- if ray strikes line. ray should be compared against World also
-          | Wall Line Int
+data Wall 
+     = Portal Line Vector2D World 
+     --  The vector is the Normal (pointing in whatever direction is into the world) 
+     | Wall Line Int
             
 mkWall :: Point2D -> Point2D -> Int -> Wall             
 mkWall p1 p2 ident  = Wall (Line p1 p2) ident 
-mkPortal :: Point2D -> Point2D -> World -> Wall 
-mkPortal p1 p2 world = Portal (Line p1 p2) world
+mkPortal :: Point2D -> Point2D -> Vector2D -> World -> Wall 
+mkPortal p1 p2 v world = Portal (Line p1 p2) v world
             
 
 ----------------------------------------------------------------------------
@@ -44,17 +47,17 @@ testWorld1 = World [mkWall (-256,-256) (-256, 256) 1,
                     mkWall ( 256,-256) (-256,-256) 6]
 -} 
 
-testWorld1 = World [mkPortal ( 0, 0) ( 0, 256) testWorld2, 
+testWorld1 = World [mkPortal ( 0, 0) ( 0, 256) (1,0) testWorld2, 
                     mkWall   ( 0, 256) ( 256, 256) 2,
                     mkWall   ( 256, 256) ( 256, 0) 3, 
                     mkWall   ( 256, 0) ( 0, 0) 4] 
                    
                    
                    
-testWorld2 = World [-- mkPortal ( 0, 0) ( 0, 256) testWorld1,
-                    mkWall   ( 0, 256) (-256, 256) 5,
-                    mkWall   (-256, 256) (-256, 0) 6,
-                    mkWall   (-256, 0) ( 0, 0) 7]
+testWorld2 = World [mkPortal ( 0, 0) ( 0, 256) (-1,0) testWorld1,
+                    mkWall   ( 0, 256) (-512, 256) 5,
+                    mkWall   (-512, 256) (-512, 0) 6,
+                    mkWall   (-512, 0) ( 0, 0) 7]
 
 ----------------------------------------------------------------------------
 -- some constants
@@ -116,8 +119,9 @@ castRay world pos angle column = Slice top bot texValue texCol (min 1.0 (lightRa
 
 wallIntersect :: Ray -> Wall -> Maybe Point2D    
 wallIntersect ray (Wall line id)  = intersect ray line   
-wallIntersect ray (Portal line _) = intersect ray line
-    
+wallIntersect ray (Portal line v _) = if (vecDot (rayDeltas ray) v <= 0.0) 
+                                      then intersect ray line
+                                      else Nothing 
 distanceAlongLine p (Line s _) 
   = distance p s                                    
                                     
@@ -125,7 +129,7 @@ castRay2 :: World ->  Ray  -> (Float,Int32,Int32)
 castRay2 world ray = 
          case wall of 
             (Just (Wall _ _)) -> (d,1,offset) -- cheat a bit for now  
-            (Just (Portal _ w')) -> castRay2 w' ray 
+            (Just (Portal _ _ w')) -> {-trace "Portal" $-}  castRay2 w' ray 
             Nothing -> (d,1,offset)
   where 
     walls = worldWalls world              
@@ -144,7 +148,7 @@ castRay2 world ray =
     wall = (\(_,_,w) -> w) dist      
                     
     tex (_,p,Just (Wall l _)) = floori_ (distanceAlongLine p l)  `mod` textureWidth
-    tex (_,_,Just (Portal _ _) ) = 45
+    tex (_,_,Just (Portal _ _ _) ) = 45
     tex (_,_,Nothing) = 32         
                        
     minimum' [(a,i)] = (a,i) 
@@ -169,6 +173,7 @@ type Vector2D = (Float,Float)
 type Point2D  = (Float,Float) -- floats now ? 
 
 vecAdd (x,y) (ax,ay) = (x+ax,y+ay)
+vecDot (x1,y1) (x2,y2) = x1*x2 + y1*y2
 
 data Ray     = Ray  Point2D Vector2D -- Point direction representation    
 
