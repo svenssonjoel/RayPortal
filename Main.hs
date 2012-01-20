@@ -24,27 +24,27 @@ data World = World {worldWalls :: [Wall]}
 
 ----------------------------------------------------------------------------
 -- A wall is either a portal or a visible wall
-data Wall = Portal Line World -- if ray strikes world. ray should be compared against World also
+data Wall = Portal Line World -- if ray strikes line. ray should be compared against World also
           | Wall Line Int
             
-{- 
-testWorld1 = World [Wall (Line (-256,-256) (-256,256)) 1, 
-                    Wall (Line (-256,256) (256,256)) 2, 
-                    Wall (Line (256,256) (256,-256)) 3, 
-                    Wall (Line (256,-256) (-256,-256)) 4]
--} 
+mkWall :: Point2D -> Point2D -> Int -> Wall             
+mkWall p1 p2 ident  = Wall (Line p1 p2) ident 
+mkPortal :: Point2D -> Point2D -> World -> Wall 
+mkPortal p1 p2 world = Portal (Line p1 p2) world
+            
 
-testWorld1 = World [Wall (Line (-256,-256) (-256, 256)) 1, 
-                    Wall (Line (-256, 256) (-128, 384)) 2, 
-                    Wall (Line (-128, 384) ( 0  , 256)) 3,
-                    Wall (Line ( 0  , 256) ( 256, 256)) 4, 
-                    Wall (Line ( 256, 256) ( 256,-256)) 5, 
-                    Wall (Line ( 256,-256) (-256,-256)) 6]
-
+----------------------------------------------------------------------------
+-- test 
+testWorld1 = World [mkWall (-256,-256) (-256, 256) 1, 
+                    mkWall (-256, 256) (-128, 384) 2, 
+                    mkWall (-128, 384) ( 0  , 256) 3,
+                    mkWall ( 0  , 256) ( 256, 256) 4, 
+                    mkWall ( 256, 256) ( 256,-256) 5, 
+                    mkWall ( 256,-256) (-256,-256) 6]
 
 ----------------------------------------------------------------------------
 -- some constants
-viewDistance   = floori_ (fromIntegral windowWidth * 0.6) -- 192 at 320  
+viewDistance   = floori_ (fromIntegral windowWidth * 0.6)  
 walkSpeed      = wallWidth `div` 16
 
 lightRadius    = 128.0
@@ -53,8 +53,6 @@ lightRadius    = 128.0
 wallHeight, wallWidth :: Int32 
 wallHeight      = 256
 wallWidth       = 256
-gridMask        = negate (wallWidth - 1) -- used to find gridlines
-modMask         = 255                    -- used to get value `mod` 256 by an and operation
 
 textureWidth, textureHeight :: Int32 
 textureWidth    = 256 
@@ -272,7 +270,9 @@ eventLoop screen wallTextures(up,down,left,right) (r,x,y) = do
   
   
   -- Clear screen
-  fillRect screen (Just (Rect 0 0 800 600)) pix
+  fillRect screen 
+           (Just (Rect 0 0 (fromIntegral windowWidth) (fromIntegral windowHeight))) 
+           pix
   
   -- draw all walls
   renderWalls testWorld1 (x,y) r wallTextures screen
