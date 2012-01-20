@@ -274,6 +274,7 @@ main = do
                  
 
   eventLoop screen wallTextures -- testTexture floorTex
+    testWorld1 
     (False,False,False,False) -- Keyboard state
     (0.0,128 ,128)
   
@@ -285,16 +286,15 @@ main = do
 -- process events and draw graphics 
 eventLoop :: Surface 
              -> [Surface] 
+             -> World
              -> (Bool,Bool,Bool,Bool) 
              -> (Float,Float, Float) 
              -> IO ()
-eventLoop screen wallTextures(up,down,left,right) (r,x,y) = do 
+eventLoop screen wallTextures currWorld (up,down,left,right) (r,x,y) = do 
   
   let pf = surfaceGetPixelFormat screen
   
-  
   pix <- mapRGB pf 0 32 64  
-  
   
   -- Clear screen
   fillRect screen 
@@ -302,7 +302,7 @@ eventLoop screen wallTextures(up,down,left,right) (r,x,y) = do
            pix
   
   -- draw all walls
-  renderWalls testWorld1 (x,y) r wallTextures screen
+  renderWalls currWorld (x,y) r wallTextures screen
 
 
   SDL.flip screen
@@ -330,12 +330,20 @@ eventLoop screen wallTextures(up,down,left,right) (r,x,y) = do
               otherwise  -> (up,down,left,right,False)
           Quit -> (up,down,left,right,True) 
           otherwise -> (up,down,left,right,False)
-  
-  let (r',x',y') = (moveLeft left' . moveRight right' . moveUp up' . moveDown down') (r,x,y) 
-
-  unless b $ eventLoop screen wallTextures (up',down',left',right') (r',x',y')     
+  let (r',x',y') = (moveLeft left' . moveRight right' . moveUp up' . moveDown down') (r,x,y)         
+          
+  let portals       = filter isPortal (worldWalls currWorld)
+  let portIntersect = filter ((/= Nothing) . fst) [(intersect (Ray (x,y) (x'-x,y'-y)) l,p) | p@(Portal l _ _) <-  portals]  
+  let currWorld'    = 
+        case (map snd portIntersect) of 
+          [] -> currWorld
+          [(Portal _ _ world')] -> world'
+          _ -> error "what!"
+      
+  unless b $ eventLoop screen wallTextures currWorld' (up',down',left',right') (r',x',y')     
   
   where 
+    
     moveLeft  b (r,x,y) = if b then (r-0.04,x,y) else (r,x,y) 
     moveRight b (r,x,y) = if b then (r+0.04,x,y) else (r,x,y) 
     moveUp    b (r,x,y) = if b && movementAllowed (x',y') then (r,x',y')   else (r,x,y) 
@@ -347,3 +355,7 @@ eventLoop screen wallTextures(up,down,left,right) (r,x,y) = do
         x' = x + (fromIntegral walkSpeed*sin r)
         y' = y - (fromIntegral walkSpeed*cos r)
     movementAllowed (px,py) = True -- Just allow it. for now.
+
+    
+    isPortal (Portal _ _ _) = True
+    isPortal _ = False
