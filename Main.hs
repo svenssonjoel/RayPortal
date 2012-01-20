@@ -35,12 +35,26 @@ mkPortal p1 p2 world = Portal (Line p1 p2) world
 
 ----------------------------------------------------------------------------
 -- test 
+{- 
 testWorld1 = World [mkWall (-256,-256) (-256, 256) 1, 
                     mkWall (-256, 256) (-128, 384) 2, 
                     mkWall (-128, 384) ( 0  , 256) 3,
                     mkWall ( 0  , 256) ( 256, 256) 4, 
                     mkWall ( 256, 256) ( 256,-256) 5, 
                     mkWall ( 256,-256) (-256,-256) 6]
+-} 
+
+testWorld1 = World [mkPortal ( 0, 0) ( 0, 256) testWorld2, 
+                    mkWall   ( 0, 256) ( 256, 256) 2,
+                    mkWall   ( 256, 256) ( 256, 0) 3, 
+                    mkWall   ( 256, 0) ( 0, 0) 4] 
+                   
+                   
+                   
+testWorld2 = World [-- mkPortal ( 0, 0) ( 0, 256) testWorld1,
+                    mkWall   ( 0, 256) (-256, 256) 5,
+                    mkWall   (-256, 256) (-256, 0) 6,
+                    mkWall   (-256, 0) ( 0, 0) 7]
 
 ----------------------------------------------------------------------------
 -- some constants
@@ -90,30 +104,36 @@ castRay world pos angle column = Slice top bot texValue texCol (min 1.0 (lightRa
     height = floori_ $ fromIntegral (viewDistance * wallHeight) / dist
     dist = dist' * cos columnAngle
     col = column - viewportCenterX
-    (dist', texValue, texCol) = castRay2 world 0.0 ray 
+    (dist', texValue, texCol) = castRay2 world ray 
  
    
 
 
 ----------------------------------------------------------------------------
 -- castRay2
-    
-wallIntersect ray (Wall line id)  = (intersect ray line, line)  
-wallIntersect ray (Portal line _) = (intersect ray line, line)
+
+
+
+wallIntersect :: Ray -> Wall -> Maybe Point2D    
+wallIntersect ray (Wall line id)  = intersect ray line   
+wallIntersect ray (Portal line _) = intersect ray line
     
 distanceAlongLine p (Line s _) 
   = distance p s                                    
                                     
-castRay2 :: World -> Float -> Ray  -> (Float,Int32,Int32)
-castRay2 world accDist ray = (d,1,offset) -- cheat a bit for now  
-   
+castRay2 :: World ->  Ray  -> (Float,Int32,Int32)
+castRay2 world ray = 
+         case wall of 
+            (Just (Wall _ _)) -> (d,1,offset) -- cheat a bit for now  
+            (Just (Portal _ w')) -> castRay2 w' ray 
+            Nothing -> (d,1,offset)
   where 
     walls = worldWalls world              
     
     -- test intersection against all walls 
     intersections = map (wallIntersect ray) walls
     
-    distances     = [(distance (rayStart ray) p,p,Just l) | (Just p,l) <- intersections]
+    distances     = [(distance (rayStart ray) p,p,Just l) | (Just p,l) <- zip intersections walls]
     dist'         = sortBy (\(x,_,_) (y,_,_) -> compare x y) distances  
     dist          = if null dist' then (1024.0,(0,0),Nothing) else (head dist')
     
@@ -121,8 +141,10 @@ castRay2 world accDist ray = (d,1,offset) -- cheat a bit for now
                                                                    
     d = (\(x,_,_) -> x) dist 
     offset = tex dist 
-                          
-    tex (_,p,Just l) = floori_ (distanceAlongLine p l)  `mod` textureWidth
+    wall = (\(_,_,w) -> w) dist      
+                    
+    tex (_,p,Just (Wall l _)) = floori_ (distanceAlongLine p l)  `mod` textureWidth
+    tex (_,_,Just (Portal _ _) ) = 45
     tex (_,_,Nothing) = 32         
                        
     minimum' [(a,i)] = (a,i) 
