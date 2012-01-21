@@ -7,6 +7,7 @@
 module Main where 
 
 import Graphics.UI.SDL as SDL
+import Graphics.UI.SDL.TTF as FONT
 
 import Control.Monad
 
@@ -257,7 +258,10 @@ drawSlice textures surf col slice =
 -- Main !
 main = do 
   SDL.init [InitEverything] 
-  
+  FONT.init  
+    
+  fnt <- openFont "Data/LiberationMono-Regular.ttf" 9  
+    
   setVideoMode (fromIntegral windowWidth) 
                (fromIntegral windowHeight) 32 []
 
@@ -275,10 +279,12 @@ main = do
 
   eventLoop screen wallTextures -- testTexture floorTex
     testWorld1 
+    fnt
     (False,False,False,False) -- Keyboard state
     (0.0,128 ,128)
   
-  quit
+  FONT.quit
+  SDL.quit
     where 
       conv pf t = convertSurface t pf []
   
@@ -287,10 +293,11 @@ main = do
 eventLoop :: Surface 
              -> [Surface] 
              -> World
+             -> Font
              -> (Bool,Bool,Bool,Bool) 
              -> (Float,Float, Float) 
              -> IO ()
-eventLoop screen wallTextures currWorld (up,down,left,right) (r,x,y) = do 
+eventLoop screen wallTextures currWorld fnt (up,down,left,right) (r,x,y) = do 
   
   let pf = surfaceGetPixelFormat screen
   
@@ -304,6 +311,8 @@ eventLoop screen wallTextures currWorld (up,down,left,right) (r,x,y) = do
   -- draw all walls
   renderWalls currWorld (x,y) r wallTextures screen
 
+  txt <- renderTextSolid fnt "hello World" (Color 255 255 255)
+  blitSurface txt Nothing screen Nothing
 
   SDL.flip screen
   
@@ -340,7 +349,7 @@ eventLoop screen wallTextures currWorld (up,down,left,right) (r,x,y) = do
           [(Portal _ _ world')] -> world'
           _ -> error "what!"
       
-  unless b $ eventLoop screen wallTextures currWorld' (up',down',left',right') (r',x',y')     
+  unless b $ eventLoop screen wallTextures currWorld' fnt (up',down',left',right') (r',x',y')     
   
   where 
     

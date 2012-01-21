@@ -3,10 +3,19 @@
 * RayPortal 
   Another retro raycaster written in Haskell.
  
-  + Will support arbitrary angles between walls (not just 90 degree angles) 
-  + Will use a "portal" system to decrease the number of walls to intersect a ray against
- 
+  + supports arbitrary angles between walls (not just 90 degree angles) 
+  + uses a "portal" system to decrease the number of walls to intersect a ray against
+  
+
+  Uses hsSDL and hsSDL-ttf   
+
+* FONT
+  The font used comes from the liberation-fonts (https://fedorahosted.org/liberation-fonts/) package
+  and is under a license as described in the file Data/Font-License.txt.
+
 * TODOs 
   
-  + Implement the Portal system
-  
+  + collision against walls
+  + doors, items, monsters, etc
+  + level editor
+  + Floor and ceiling textures
