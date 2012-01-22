@@ -259,8 +259,9 @@ drawSlice textures surf col slice =
               (textures  !! (fromIntegral (sliceTex slice - 1)))
               (sliceIntensity slice) 
   
-drawTransparent :: Surface -> Surface -> (Int,Int) -> IO ()                
-drawTransparent  tr surf (x,y) = 
+
+drawTransparent :: Surface -> Surface -> Rect -> IO ()                
+drawTransparent  tr surf (Rect x y w h)  = 
   do 
     seeThrough <- mapRGB pf 255 0 255 
     targPixels <- castPtr `fmap` surfaceGetPixels surf
@@ -268,20 +269,29 @@ drawTransparent  tr surf (x,y) =
               
                   
     sequence_ [do 
-                  pixel <-  peekElemOff srcPixels (i*columns+j)
+                  pixel <-  peekElemOff srcPixels (fromIntegral (floori_ (fromIntegral i*rx)*(fromIntegral columns)+floori_ (fromIntegral j *ry)))
                   if (Pixel pixel) /= seeThrough 
                   then pokeElemOff targPixels (start+(i*width+j)) (pixel :: Word32) 
                   else return ()
-              | i <- [0..columns-1] , j <- [0..rows-1]] 
+              | i <- [0..w-1] , j <- [0..h-1]] 
                   
     where 
+      rx      = (fromIntegral columns / fromIntegral w) 
+      ry      = (fromIntegral rows / fromIntegral h) 
+ 
       start   = x + y*width 
       width   = surfaceGetWidth surf
       pf      = surfaceGetPixelFormat surf
       columns = surfaceGetWidth tr  
       rows    = surfaceGetHeight tr  
       
-          
+
+----------------------------------------------------------------------------
+-- 
+
+data GameState = GameState 
+
+type GS = S.StateT GameState IO           
 
 ----------------------------------------------------------------------------
 -- Main !
@@ -316,6 +326,7 @@ main = do
     initialTicks 
     0
     0.0
+    (128,128) 
     (False,False,False,False) -- Keyboard state
     (0.0,128 ,128)
   
@@ -334,10 +345,11 @@ eventLoop :: Surface
              -> Word32
              -> Int32
              -> Float
+             -> (Float,Float) -- monster location 
              -> (Bool,Bool,Bool,Bool) 
              -> (Float,Float, Float) 
              -> IO ()
-eventLoop screen wallTextures monster currWorld fnt ticks frames fps (up,down,left,right) (r,x,y) = do 
+eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up,down,left,right) (r,x,y) = do 
   
   let pf = surfaceGetPixelFormat screen
   
@@ -351,10 +363,11 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (up,down,le
   -- draw all walls
   renderWalls currWorld (x,y) r wallTextures screen
   
-  -- blitSurface monster (Just (Rect 0 0 255 255)) 
-  --            screen  (Just (Rect (400-128) (300-128) (400+128) (300+128)))
-
-  drawTransparent monster screen (400-128,300-128)
+  -- Compute screen coordinates of monster based on its world coordinates. 
+  -- TODO: Figure out how to do this.
+  let monsterScreenX = undefined
+      monsterScreenY = undefined 
+  drawTransparent monster screen (Rect (400-128) (300-128) 256 256)
 
   ticks2 <- getTicks 
   let (ticks',fps') = if ( ticks2 - ticks >= 1000)                            
@@ -400,7 +413,7 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (up,down,le
           [(Portal _ _ world')] -> world'
           _ -> error "what!"
       
-  unless b $ eventLoop screen wallTextures monster currWorld' fnt ticks' (frames+1) fps' (up',down',left',right') (r',x',y')     
+  unless b $ eventLoop screen wallTextures monster currWorld' fnt ticks' (frames+1) fps' (mx,my) (up',down',left',right') (r',x',y')     
   
   where 
     
