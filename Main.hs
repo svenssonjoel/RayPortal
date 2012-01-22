@@ -10,6 +10,7 @@ import Graphics.UI.SDL as SDL
 import Graphics.UI.SDL.TTF as FONT
 
 import Control.Monad
+import qualified Control.Monad.State.Strict as S 
 
 import Data.Word
 import Data.Int
@@ -308,7 +309,7 @@ eventLoop screen wallTextures currWorld fnt ticks frames fps (up,down,left,right
   
   let pf = surfaceGetPixelFormat screen
   
-  pix <- mapRGB pf 0 32 64  
+  pix <- mapRGB pf 16 16 16 
   
   -- Clear screen
   fillRect screen 
