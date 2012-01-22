@@ -20,6 +20,8 @@ import Data.Maybe
 import CExtras
 import MathExtras
 
+import Foreign.Ptr 
+import Foreign.Storable
 import Debug.Trace
 ----------------------------------------------------------------------------
 -- A world of Walls
@@ -37,6 +39,9 @@ mkWall p1 p2 ident  = Wall (Line p1 p2) ident
 mkPortal :: Point2D -> Point2D -> Vector2D -> World -> Wall 
 mkPortal p1 p2 v world = Portal (Line p1 p2) v world
             
+
+
+
 
 ----------------------------------------------------------------------------
 -- test 
@@ -254,6 +259,29 @@ drawSlice textures surf col slice =
               (textures  !! (fromIntegral (sliceTex slice - 1)))
               (sliceIntensity slice) 
   
+drawTransparent :: Surface -> Surface -> (Int,Int) -> IO ()                
+drawTransparent  tr surf (x,y) = 
+  do 
+    seeThrough <- mapRGB pf 255 0 255 
+    targPixels <- castPtr `fmap` surfaceGetPixels surf
+    srcPixels  <- castPtr `fmap` surfaceGetPixels tr 
+              
+                  
+    sequence_ [do 
+                  pixel <-  peekElemOff srcPixels (i*columns+j)
+                  if (Pixel pixel) /= seeThrough 
+                  then pokeElemOff targPixels (start+(i*width+j)) (pixel :: Word32) 
+                  else return ()
+              | i <- [0..columns-1] , j <- [0..rows-1]] 
+                  
+    where 
+      start   = x + y*width 
+      width   = surfaceGetWidth surf
+      pf      = surfaceGetPixelFormat surf
+      columns = surfaceGetWidth tr  
+      rows    = surfaceGetHeight tr  
+      
+          
 
 ----------------------------------------------------------------------------
 -- Main !
@@ -277,9 +305,12 @@ main = do
   wallTextures <- sequence [conv pf =<< loadBMP "Data/textureLarge1.bmp"
                            ,conv pf =<< loadBMP "Data/textureLarge2.bmp"]
                  
+  
+  monster <- conv pf =<< loadBMP "Data/eye1.bmp"  
 
   initialTicks <- getTicks
   eventLoop screen wallTextures -- testTexture floorTex
+    monster 
     testWorld1 
     fnt
     initialTicks 
@@ -297,6 +328,7 @@ main = do
 -- process events and draw graphics 
 eventLoop :: Surface 
              -> [Surface] 
+             -> Surface
              -> World
              -> Font
              -> Word32
@@ -305,7 +337,7 @@ eventLoop :: Surface
              -> (Bool,Bool,Bool,Bool) 
              -> (Float,Float, Float) 
              -> IO ()
-eventLoop screen wallTextures currWorld fnt ticks frames fps (up,down,left,right) (r,x,y) = do 
+eventLoop screen wallTextures monster currWorld fnt ticks frames fps (up,down,left,right) (r,x,y) = do 
   
   let pf = surfaceGetPixelFormat screen
   
@@ -318,6 +350,11 @@ eventLoop screen wallTextures currWorld fnt ticks frames fps (up,down,left,right
   
   -- draw all walls
   renderWalls currWorld (x,y) r wallTextures screen
+  
+  -- blitSurface monster (Just (Rect 0 0 255 255)) 
+  --            screen  (Just (Rect (400-128) (300-128) (400+128) (300+128)))
+
+  drawTransparent monster screen (400-128,300-128)
 
   ticks2 <- getTicks 
   let (ticks',fps') = if ( ticks2 - ticks >= 1000)                            
@@ -363,7 +400,7 @@ eventLoop screen wallTextures currWorld fnt ticks frames fps (up,down,left,right
           [(Portal _ _ world')] -> world'
           _ -> error "what!"
       
-  unless b $ eventLoop screen wallTextures currWorld' fnt ticks' (frames+1) fps' (up',down',left',right') (r',x',y')     
+  unless b $ eventLoop screen wallTextures monster currWorld' fnt ticks' (frames+1) fps' (up',down',left',right') (r',x',y')     
   
   where 
     
