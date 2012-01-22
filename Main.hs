@@ -260,7 +260,7 @@ main = do
   SDL.init [InitEverything] 
   FONT.init  
     
-  fnt <- openFont "Data/LiberationMono-Regular.ttf" 9  
+  fnt <- openFont "Data/LiberationMono-Regular.ttf" 14 
     
   setVideoMode (fromIntegral windowWidth) 
                (fromIntegral windowHeight) 32 []
@@ -277,9 +277,13 @@ main = do
                            ,conv pf =<< loadBMP "Data/textureLarge2.bmp"]
                  
 
+  initialTicks <- getTicks
   eventLoop screen wallTextures -- testTexture floorTex
     testWorld1 
     fnt
+    initialTicks 
+    0
+    0.0
     (False,False,False,False) -- Keyboard state
     (0.0,128 ,128)
   
@@ -294,10 +298,13 @@ eventLoop :: Surface
              -> [Surface] 
              -> World
              -> Font
+             -> Word32
+             -> Int32
+             -> Float
              -> (Bool,Bool,Bool,Bool) 
              -> (Float,Float, Float) 
              -> IO ()
-eventLoop screen wallTextures currWorld fnt (up,down,left,right) (r,x,y) = do 
+eventLoop screen wallTextures currWorld fnt ticks frames fps (up,down,left,right) (r,x,y) = do 
   
   let pf = surfaceGetPixelFormat screen
   
@@ -311,13 +318,19 @@ eventLoop screen wallTextures currWorld fnt (up,down,left,right) (r,x,y) = do
   -- draw all walls
   renderWalls currWorld (x,y) r wallTextures screen
 
-  txt <- renderTextSolid fnt "hello World" (Color 255 255 255)
+  ticks2 <- getTicks 
+  let (ticks',fps') = if ( ticks2 - ticks >= 1000)                            
+                      then (ticks2,fromIntegral frames / (fromIntegral ticks' / 1000))
+                      else (1,fps)     
+  
+  txt <- renderTextSolid fnt ("FPS: " ++ show fps') (Color 255 255 255)
   blitSurface txt Nothing screen Nothing
 
   SDL.flip screen
   
   -- process events 
   e <- pollEvent
+  
   
   
   let (up',down',left',right',b) = 
@@ -349,7 +362,7 @@ eventLoop screen wallTextures currWorld fnt (up,down,left,right) (r,x,y) = do
           [(Portal _ _ world')] -> world'
           _ -> error "what!"
       
-  unless b $ eventLoop screen wallTextures currWorld' fnt (up',down',left',right') (r',x',y')     
+  unless b $ eventLoop screen wallTextures currWorld' fnt ticks' (frames+1) fps' (up',down',left',right') (r',x',y')     
   
   where 
     
