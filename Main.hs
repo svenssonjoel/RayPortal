@@ -326,7 +326,7 @@ main = do
     initialTicks 
     0
     0.0
-    (128,128) 
+    (-384,128) 
     (False,False,False,False) -- Keyboard state
     (0.0,128 ,128)
   
@@ -365,10 +365,22 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
   
   -- Compute screen coordinates of monster based on its world coordinates. 
   -- TODO: Figure out how to do this.
-  let monsterScreenX = undefined
-      monsterScreenY = undefined 
-  drawTransparent monster screen (Rect (400-128) (300-128) 256 256)
-
+  let mx' = (mx-x)
+      my' = (my-y)  
+      monsterViewX = mx' * cos (-r) - my' * sin (-r) 
+      monsterViewY = mx' * sin (-r) + my' * cos (-r) 
+  if (monsterViewY >= 0) 
+    then 
+    do 
+      let 
+        mdist = sqrt (monsterViewX*monsterViewX+monsterViewY*monsterViewY)
+        projx = monsterViewX*fromIntegral viewDistance / mdist + 400
+        mw = fromIntegral $ min 255 (floori_ (256*(fromIntegral viewDistance/mdist)))
+        mh = fromIntegral $ min 255 (floori_ (256*(fromIntegral viewDistance/mdist)))
+      if (floori_ projx > 0 || floori_ projx < 800-(fromIntegral mw))
+        then drawTransparent monster screen (Rect (fromIntegral (floori_ projx)) (300-(mh `div` 2)) mw mh)
+        else return () 
+    else return ()
   ticks2 <- getTicks 
   let (ticks',fps') = if ( ticks2 - ticks >= 1000)                            
                       then (ticks2,fromIntegral frames / (fromIntegral ticks' / 1000))
