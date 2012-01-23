@@ -52,8 +52,13 @@ testWorld1 = World [mkWall (-256,-256) (-256, 256) 1,
                     mkWall ( 0  , 256) ( 256, 256) 4, 
                     mkWall ( 256, 256) ( 256,-256) 5, 
                     mkWall ( 256,-256) (-256,-256) 6]
--} 
+-}
+testWorld1 = World [mkWall (-512,-512) (-512, 512) 1, 
+                    mkWall (-512, 512) ( 512, 512) 2,
+                    mkWall ( 512, 512) ( 512,-512) 3, 
+                    mkWall ( 512,-512) (-512,-512) 4]
 
+{-
 testWorld1 = World [mkPortal ( 0, 0) ( 0, 256) (1,0) testWorld2, 
                     mkWall   ( 0, 256) ( 256, 256) 2,
                     mkWall   ( 256, 256) ( 256, 0) 3, 
@@ -65,11 +70,12 @@ testWorld2 = World [mkPortal ( 0, 0) ( 0, 256) (-1,0) testWorld1,
                     mkWall   ( 0, 256) (-512, 256) 5,
                     mkWall   (-512, 256) (-512, 0) 6,
                     mkWall   (-512, 0) ( 0, 0) 7]
-
+-}
 ----------------------------------------------------------------------------
 -- some constants
 viewDistance   = floori_ (fromIntegral windowWidth * 0.6)  
 walkSpeed      = wallWidth `div` 16
+maxVisible     = 2048
 
 lightRadius    = 128.0
 
@@ -146,7 +152,7 @@ castRay2 world ray =
     
     distances     = [(distance (rayStart ray) p,p,Just l) | (Just p,l) <- zip intersections walls]
     dist'         = sortBy (\(x,_,_) (y,_,_) -> compare x y) distances  
-    dist          = if null dist' then (1024.0,(0,0),Nothing) else (head dist')
+    dist          = if null dist' then (fromIntegral maxVisible,(0,0),Nothing) else (head dist')
     
     -- TODO: Clean this mess up 
                                                                    
@@ -185,7 +191,7 @@ vecDot (x1,y1) (x2,y2) = x1*x2 + y1*y2
 data Ray     = Ray  Point2D Vector2D -- Point direction representation    
 
 mkRay :: Point2D -> Float -> Ray 
-mkRay p r    = Ray p (-1024.0*sin r, 1024.0*cos r)  
+mkRay p r    = Ray p ((-fromIntegral maxVisible)*sin r, fromIntegral maxVisible*cos r)  
 
 data Line    = Line Point2D Point2D -- two points on the line  
 
@@ -326,7 +332,7 @@ main = do
     initialTicks 
     0
     0.0
-    (-384,128) 
+    (0,0) 
     (False,False,False,False) -- Keyboard state
     (0.0,128 ,128)
   
@@ -367,27 +373,44 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
   -- TODO: Figure out how to do this.
   let mx' = (mx-x)
       my' = (my-y)  
-      monsterViewX = mx' * cos (-r) - my' * sin (-r) 
-      monsterViewY = mx' * sin (-r) + my' * cos (-r) 
+      monsterViewX = 0 -- cant get it right. 
+      monsterViewY = 0 -- 
+      mdist = sqrt (monsterViewX*monsterViewX+monsterViewY*monsterViewY)
+      
+      projx = monsterViewX*fromIntegral viewDistance / mdist + 400
   if (monsterViewY >= 0) 
     then 
     do 
       let 
-        mdist = sqrt (monsterViewX*monsterViewX+monsterViewY*monsterViewY)
-        projx = monsterViewX*fromIntegral viewDistance / mdist + 400
-        mw = fromIntegral $ min 255 (floori_ (256*(fromIntegral viewDistance/mdist)))
-        mh = fromIntegral $ min 255 (floori_ (256*(fromIntegral viewDistance/mdist)))
-      if (floori_ projx > 0 || floori_ projx < 800-(fromIntegral mw))
+        mw = fromIntegral $ min 256 (floori_ (256*(fromIntegral viewDistance/mdist)))
+        mh = fromIntegral $ min 256 (floori_ (256*(fromIntegral viewDistance/mdist)))
+      if (floori_ projx > 0 && floori_ projx < 800-(fromIntegral mw))
         then drawTransparent monster screen (Rect (fromIntegral (floori_ projx)) (300-(mh `div` 2)) mw mh)
         else return () 
     else return ()
+         
   ticks2 <- getTicks 
   let (ticks',fps') = if ( ticks2 - ticks >= 1000)                            
                       then (ticks2,fromIntegral frames / (fromIntegral ticks' / 1000))
                       else (1,fps)     
   
-  txt <- renderTextSolid fnt ("FPS: " ++ show fps') (Color 255 255 255)
+  txt <- renderTextSolid fnt ("FPS: " ++ show fps') (Color 255 255 255) 
+  txt1 <- renderTextSolid fnt ("pos: " ++ show (x,y)) (Color 255 255 255)  
+  txt2 <- renderTextSolid fnt ("mpos: " ++ show (monsterViewX,monsterViewY)) (Color 255 255 255)  
+  txt3 <- renderTextSolid fnt ("mprojx: " ++ show projx) (Color 255 255 255)  
+  txt4 <- renderTextSolid fnt ("morig: " ++ show (mx,my)) (Color 255 255 255)  
+  txt5 <- renderTextSolid fnt ("mtrans: " ++ show (mx',my')) (Color 255 255 255)  
+  txt6 <- renderTextSolid fnt ("radians: " ++ show r) (Color 255 255 255)  
+--  txt3 <- renderTextSolid fnt ("mprojx: " ++ show projx) (Color 255 255 255)  
+  
+  
   blitSurface txt Nothing screen Nothing
+  blitSurface txt1 Nothing screen (Just (Rect 0 15 800 600))
+  blitSurface txt2 Nothing screen (Just (Rect 0 30 800 600))
+  blitSurface txt3 Nothing screen (Just (Rect 0 45 800 600))
+  blitSurface txt4 Nothing screen (Just (Rect 0 60 800 600))
+  blitSurface txt5 Nothing screen (Just (Rect 0 75 800 600))
+  blitSurface txt6 Nothing screen (Just (Rect 0 100 800 600))
 
   SDL.flip screen
   
@@ -433,11 +456,11 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
     moveRight b (r,x,y) = if b then (r+0.04,x,y) else (r,x,y) 
     moveUp    b (r,x,y) = if b && movementAllowed (x',y') then (r,x',y')   else (r,x,y) 
       where 
-        x' = x - (fromIntegral walkSpeed*sin r)
+        x' = x + ((-fromIntegral walkSpeed)*sin r)
         y' = y + (fromIntegral walkSpeed*cos r)
     moveDown  b (r,x,y) = if b && movementAllowed (x',y') then (r,x',y')   else (r,x,y) 
       where 
-        x' = x + (fromIntegral walkSpeed*sin r)
+        x' = x - ((-fromIntegral walkSpeed)*sin r)
         y' = y - (fromIntegral walkSpeed*cos r)
     movementAllowed (px,py) = True -- Just allow it. for now.
 
