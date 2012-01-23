@@ -52,8 +52,17 @@ testWorld1 = World [mkWall (-256,-256) (-256, 256) 1,
                     mkWall ( 0  , 256) ( 256, 256) 4, 
                     mkWall ( 256, 256) ( 256,-256) 5, 
                     mkWall ( 256,-256) (-256,-256) 6]
--}
 testWorld1 = World [mkWall (-512,-512) (-512, 512) 1, 
+                    mkWall (-512, 512) ( 512, 512) 2,
+                    mkWall ( 512, 512) ( 512,-512) 3, 
+                    mkWall ( 512,-512) (-512,-512) 4]
+
+-}
+testWorld1 = World [mkWall (-512,-512) (-512,-128) 1, 
+                    mkWall (-512,-128) (-640, 0)   1, 
+                    mkWall (-640, 0  ) (-512, 128) 1,  
+                    mkWall (-512, 128) (-512, 512) 1,  
+                    
                     mkWall (-512, 512) ( 512, 512) 2,
                     mkWall ( 512, 512) ( 512,-512) 3, 
                     mkWall ( 512,-512) (-512,-512) 4]
@@ -171,8 +180,6 @@ castRay2 world ray =
 
 -- TODO: improve on these (better names)   
     
-posRayDx  (Ray _ (dx,_)) = dx > 0   
-posRayDy  (Ray _ (_,dy)) = dy > 0 
 rayX      (Ray (x,_) _) = x
 rayY      (Ray (_,y) _) = y 
 rayDx     (Ray _ (dx,_)) = dx 
@@ -332,7 +339,7 @@ main = do
     initialTicks 
     0
     0.0
-    (0,0) 
+    (-620,0) 
     (False,False,False,False) -- Keyboard state
     (0.0,128 ,128)
   
@@ -373,13 +380,13 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
   -- TODO: Figure out how to do this.
   let mx' = (mx-x) 
       my' = (my-y)  
-  
+            
       monsterViewX = mx' * cos (-r) - my' * sin (-r)
       monsterViewY = my' * cos (-r) + mx' * sin (-r) 
       mdist = sqrt (mx'*mx'+my'*my')
       
       projx = monsterViewX*fromIntegral viewDistance / mdist + 400
-  if (monsterViewY >= 0) 
+  if ( monsterViewY >= 0) 
     then 
     do 
       let 
