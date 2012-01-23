@@ -52,13 +52,13 @@ testWorld1 = World [mkWall (-256,-256) (-256, 256) 1,
                     mkWall ( 0  , 256) ( 256, 256) 4, 
                     mkWall ( 256, 256) ( 256,-256) 5, 
                     mkWall ( 256,-256) (-256,-256) 6]
-
+-}
 testWorld1 = World [mkWall (-512,-512) (-512, 512) 1, 
                     mkWall (-512, 512) ( 512, 512) 2,
                     mkWall ( 512, 512) ( 512,-512) 3, 
                     mkWall ( 512,-512) (-512,-512) 4]
 
--}
+{-
 testWorld1 = World [mkPortal ( 0, 0) ( 0, 256) (1,0) testWorld2, 
                     mkWall   ( 0, 256) ( 256, 256) 2,
                     mkWall   ( 256, 256) ( 256, 0) 3, 
@@ -70,7 +70,7 @@ testWorld2 = World [mkPortal ( 0, 0) ( 0, 256) (-1,0) testWorld1,
                     mkWall   ( 0, 256) (-512, 256) 5,
                     mkWall   (-512, 256) (-512, 0) 6,
                     mkWall   (-512, 0) ( 0, 0) 7]
-
+-}
 ----------------------------------------------------------------------------
 -- some constants
 viewDistance   = floori_ (fromIntegral windowWidth * 0.6)  
@@ -191,7 +191,7 @@ vecDot (x1,y1) (x2,y2) = x1*x2 + y1*y2
 data Ray     = Ray  Point2D Vector2D -- Point direction representation    
 
 mkRay :: Point2D -> Float -> Ray 
-mkRay p r    = Ray p (-fromIntegral maxVisible*sin r, fromIntegral maxVisible*cos r)  
+mkRay p r    = Ray p (fromIntegral maxVisible*cos r, fromIntegral maxVisible*sin r)  
 
 data Line    = Line Point2D Point2D -- two points on the line  
 
@@ -332,7 +332,7 @@ main = do
     initialTicks 
     0
     0.0
-    (128,128) 
+    (0,0) 
     (False,False,False,False) -- Keyboard state
     (0.0,128 ,128)
   
@@ -371,14 +371,13 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
   
   -- Compute screen coordinates of monster based on its world coordinates. 
   -- TODO: Figure out how to do this.
-  let mx' = (mx-x)
+  let mx' = (mx-x) 
       my' = (my-y)  
-      
+  
       monsterViewX = mx' * cos (-r) - my' * sin (-r)
       monsterViewY = my' * cos (-r) + mx' * sin (-r) 
       mdist = sqrt (mx'*mx'+my'*my')
       
-     
       projx = monsterViewX*fromIntegral viewDistance / mdist + 400
   if (monsterViewY >= 0) 
     then 
@@ -458,12 +457,12 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
     moveRight b (r,x,y) = if b then (r+0.04,x,y) else (r,x,y) 
     moveUp    b (r,x,y) = if b && movementAllowed (x',y') then (r,x',y')   else (r,x,y) 
       where 
-        x' = x - (fromIntegral walkSpeed*sin r)
-        y' = y + (fromIntegral walkSpeed*cos r)
+        x' = x + (fromIntegral walkSpeed*cos r)
+        y' = y + (fromIntegral walkSpeed*sin r)
     moveDown  b (r,x,y) = if b && movementAllowed (x',y') then (r,x',y')   else (r,x,y) 
       where 
-        x' = x + (fromIntegral walkSpeed*sin r)
-        y' = y - (fromIntegral walkSpeed*cos r)
+        x' = x - (fromIntegral walkSpeed*cos r)
+        y' = y - (fromIntegral walkSpeed*sin r)
     movementAllowed (px,py) = True -- Just allow it. for now.
 
     
