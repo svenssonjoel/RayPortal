@@ -122,7 +122,7 @@ type Angle = Float
 castRay :: World -> Point2D -> Angle -> Int32 -> Slice 
 castRay world pos angle column = Slice top bot texValue texCol (min 1.0 (lightRadius/dist))  
   where 
-    ray  = mkRay pos (angle + columnAngle)
+    ray  = mkRay pos (angle - columnAngle)
     columnAngle = atan $ fromIntegral col / fromIntegral viewDistance
     top  = bot - height 
     bot  = floori_ $ fromIntegral viewportCenterY + (fromIntegral height / 2) 
@@ -202,6 +202,9 @@ data Ray     = Ray  Point2D Vector2D -- Point direction representation
 
 mkRay :: Point2D -> Float -> Ray 
 mkRay p r    = Ray p (-fromIntegral maxVisible*sin r, fromIntegral maxVisible*cos r)  
+-- why -sin r :=x and cos r := y  
+-- see: http://www.dpfiles.com/dpfileswiki/index.php?title=Black_Art_of_3D_Game_Programming%2C_Chapter_10:_3D_Fundamentals#Rotation
+-- (really bad explanaion though) 
 
 data Line    = Line Point2D Point2D -- two points on the line  
 
@@ -261,7 +264,7 @@ renderWalls world pos angle textures surf =
     zipWithM_ (drawSlice textures surf) [0..windowWidth-1] slices 
     return slices
   where 
-    slices = map (castRay world pos angle)  (reverse [0..windowWidth-1])
+    slices = map (castRay world pos angle)  [0..windowWidth-1]
     
 drawSlice :: [Surface] -> Surface -> Int32 -> Slice -> IO () 
 drawSlice textures surf col slice = 
@@ -414,7 +417,7 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
                       else (1,fps)     
                            
                            
-{- --  renderMsg fnt ("FPS: " ++ show fps') (0,0) screen                          
+ --  renderMsg fnt ("FPS: " ++ show fps') (0,0) screen                          
   -- Causes segfault!  
   txt <- renderTextSolid fnt ("FPS: " ++ show fps') (Color 255 255 255) 
   txt1 <- renderTextSolid fnt ("pos: " ++ show (x,y)) (Color 255 255 255)  
@@ -440,7 +443,7 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
   freeSurface txt4
   freeSurface txt5
   freeSurface txt6
--}   
+   
 
   SDL.flip screen
   
