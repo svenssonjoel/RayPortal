@@ -161,7 +161,9 @@ castRay2 world ray =
     
     distances     = [(distance (rayStart ray) p,p,Just l) | (Just p,l) <- zip intersections walls]
     dist'         = sortBy (\(x,_,_) (y,_,_) -> compare x y) distances  
-    dist          = if null dist' then (fromIntegral maxVisible,(0,0),Nothing) else (head dist')
+    dist          = if null dist' 
+                    then (fromIntegral maxVisible,(0,0),Nothing) 
+                    else  (head dist')
     
     -- TODO: Clean this mess up 
                                                                    
@@ -193,12 +195,13 @@ type Vector2D = (Float,Float)
 type Point2D  = (Float,Float) -- floats now ? 
 
 vecAdd (x,y) (ax,ay) = (x+ax,y+ay)
+vecSub (x,y) (ax,ay) = (x-ax,y-ay)
 vecDot (x1,y1) (x2,y2) = x1*x2 + y1*y2
 
 data Ray     = Ray  Point2D Vector2D -- Point direction representation    
 
 mkRay :: Point2D -> Float -> Ray 
-mkRay p r    = Ray p (fromIntegral maxVisible*cos r, fromIntegral maxVisible*sin r)  
+mkRay p r    = Ray p (-fromIntegral maxVisible*sin (r), fromIntegral maxVisible*cos (r))  
 
 data Line    = Line Point2D Point2D -- two points on the line  
 
@@ -258,7 +261,7 @@ renderWalls world pos angle textures surf =
     zipWithM_ (drawSlice textures surf) [0..windowWidth-1] slices 
     return slices
   where 
-    slices = map (castRay world pos angle)  [0..windowWidth-1]
+    slices = map (castRay world pos angle)  (reverse [0..windowWidth-1])
     
 drawSlice :: [Surface] -> Surface -> Int32 -> Slice -> IO () 
 drawSlice textures surf col slice = 
@@ -339,7 +342,7 @@ main = do
     initialTicks 
     0
     0.0
-    (-620,0) 
+    (0,0) 
     (False,False,False,False) -- Keyboard state
     (0.0,128 ,128)
   
@@ -383,7 +386,9 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
             
       monsterViewX = mx' * cos (-r) - my' * sin (-r)
       monsterViewY = my' * cos (-r) + mx' * sin (-r) 
-      mdist = sqrt (mx'*mx'+my'*my')
+      a = monsterViewX*monsterViewX
+      b = monsterViewY*monsterViewY
+      mdist = sqrt (a+b)
       
       projx = monsterViewX*fromIntegral viewDistance / mdist + 400
   if ( monsterViewY >= 0) 
@@ -460,16 +465,16 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
   
   where 
     
-    moveLeft  b (r,x,y) = if b then (r-0.04,x,y) else (r,x,y) 
-    moveRight b (r,x,y) = if b then (r+0.04,x,y) else (r,x,y) 
+    moveLeft  b (r,x,y) = if b then (r+0.04,x,y) else (r,x,y) 
+    moveRight b (r,x,y) = if b then (r-0.04,x,y) else (r,x,y) 
     moveUp    b (r,x,y) = if b && movementAllowed (x',y') then (r,x',y')   else (r,x,y) 
       where 
-        x' = x + (fromIntegral walkSpeed*cos r)
-        y' = y + (fromIntegral walkSpeed*sin r)
+        x' = x - (fromIntegral walkSpeed*sin r)
+        y' = y + (fromIntegral walkSpeed*cos r)
     moveDown  b (r,x,y) = if b && movementAllowed (x',y') then (r,x',y')   else (r,x,y) 
       where 
-        x' = x - (fromIntegral walkSpeed*cos r)
-        y' = y - (fromIntegral walkSpeed*sin r)
+        x' = x + (fromIntegral walkSpeed*sin r)
+        y' = y - (fromIntegral walkSpeed*cos r)
     movementAllowed (px,py) = True -- Just allow it. for now.
 
     
