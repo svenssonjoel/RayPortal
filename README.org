@@ -5,17 +5,21 @@
  
   + supports arbitrary angles between walls (not just 90 degree angles) 
   + uses a "portal" system to decrease the number of walls to intersect a ray against
-  
-
+  + "sprite" support in progress (stationary and moving objects) 
+   
   Uses hsSDL and hsSDL-ttf   
 
 * FONT
   The font used comes from the liberation-fonts (https://fedorahosted.org/liberation-fonts/) package
   and is under a license as described in the file Data/Font-License.txt.
-
+  
+  hsSDL-ttf causes segfaults! (no idea how to use this library correctly) 
+  
 * TODOs 
   
   + collision against walls
   + doors, items, monsters, etc
   + level editor
   + Floor and ceiling textures
+ 
+  
