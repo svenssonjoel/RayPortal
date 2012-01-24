@@ -201,7 +201,7 @@ vecDot (x1,y1) (x2,y2) = x1*x2 + y1*y2
 data Ray     = Ray  Point2D Vector2D -- Point direction representation    
 
 mkRay :: Point2D -> Float -> Ray 
-mkRay p r    = Ray p (-fromIntegral maxVisible*sin (r), fromIntegral maxVisible*cos (r))  
+mkRay p r    = Ray p (-fromIntegral maxVisible*sin r, fromIntegral maxVisible*cos r)  
 
 data Line    = Line Point2D Point2D -- two points on the line  
 
@@ -276,6 +276,8 @@ drawSlice textures surf col slice =
               (sliceIntensity slice) 
   
 
+-- TODO: use depth info 
+-- TODO: Lighting ? 
 drawTransparent :: Surface -> Surface -> Rect -> IO ()                
 drawTransparent  tr surf (Rect x y w h)  = 
   do 
@@ -285,7 +287,7 @@ drawTransparent  tr surf (Rect x y w h)  =
               
                   
     sequence_ [do 
-                  pixel <-  peekElemOff srcPixels (fromIntegral (floori_ (fromIntegral i*rx)*(fromIntegral columns)+floori_ (fromIntegral j *ry)))
+                  pixel <-  peekElemOff srcPixels (fromIntegral (floori_ (fromIntegral i*rx)+(fromIntegral columns)*floori_ (fromIntegral j *ry)))
                   if (Pixel pixel) /= seeThrough 
                   then pokeElemOff targPixels (start+(i*width+j)) (pixel :: Word32) 
                   else return ()
@@ -295,7 +297,7 @@ drawTransparent  tr surf (Rect x y w h)  =
       rx      = (fromIntegral columns / fromIntegral w) 
       ry      = (fromIntegral rows / fromIntegral h) 
  
-      start   = x + y*width 
+      start   = x + y * width 
       width   = surfaceGetWidth surf
       pf      = surfaceGetPixelFormat surf
       columns = surfaceGetWidth tr  
@@ -342,12 +344,13 @@ main = do
     initialTicks 
     0
     0.0
-    (0,0) 
+    (-640,0) 
     (False,False,False,False) -- Keyboard state
     (0.0,128 ,128)
   
   FONT.quit
   SDL.quit
+  
     where 
       conv pf t = convertSurface t pf []
   
@@ -391,14 +394,17 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
       mdist = sqrt (a+b)
       
       projx = monsterViewX*fromIntegral viewDistance / mdist + 400
+  
   if ( monsterViewY >= 0) 
     then 
     do 
       let 
+        -- TODO: FIX  (clipping not correct)
         mw = fromIntegral $ min 256 (floori_ (256*(fromIntegral viewDistance/mdist)))
         mh = fromIntegral $ min 256 (floori_ (256*(fromIntegral viewDistance/mdist)))
-      if (floori_ projx > 0 && floori_ projx < 800-(fromIntegral mw))
-        then drawTransparent monster screen (Rect (fromIntegral (floori_ projx)) (300-(mh `div` 2)) mw mh)
+        projx' = (fromIntegral (floori_ projx)) - (mw `div` 2)
+      if (projx' > 0 && projx' < 800-(mw `div` 2))
+        then drawTransparent monster screen (Rect projx' (300-(mh `div` 2)) mw mh)
         else return () 
     else return ()
          
@@ -406,7 +412,10 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
   let (ticks',fps') = if ( ticks2 - ticks >= 1000)                            
                       then (ticks2,fromIntegral frames / (fromIntegral ticks' / 1000))
                       else (1,fps)     
-  
+                           
+                           
+{- --  renderMsg fnt ("FPS: " ++ show fps') (0,0) screen                          
+  -- Causes segfault!  
   txt <- renderTextSolid fnt ("FPS: " ++ show fps') (Color 255 255 255) 
   txt1 <- renderTextSolid fnt ("pos: " ++ show (x,y)) (Color 255 255 255)  
   txt2 <- renderTextSolid fnt ("mpos: " ++ show (monsterViewX,monsterViewY)) (Color 255 255 255)  
@@ -424,6 +433,14 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
   blitSurface txt4 Nothing screen (Just (Rect 0 60 800 600))
   blitSurface txt5 Nothing screen (Just (Rect 0 75 800 600))
   blitSurface txt6 Nothing screen (Just (Rect 0 100 800 600))
+  freeSurface txt
+  freeSurface txt1
+  freeSurface txt2
+  freeSurface txt3
+  freeSurface txt4
+  freeSurface txt5
+  freeSurface txt6
+-}   
 
   SDL.flip screen
   
@@ -480,3 +497,14 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
     
     isPortal (Portal _ _ _) = True
     isPortal _ = False
+    
+    
+-- Causes segfault     
+renderMsg fnt message (x,y) surf 
+  = do 
+    txt <- renderTextSolid fnt message (Color 255 255 255)  
+    blitSurface txt Nothing surf (Just (Rect x y 800 600))
+    freeSurface txt
+  
+    
+    
