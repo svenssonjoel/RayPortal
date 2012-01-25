@@ -29,20 +29,19 @@ data World = World {worldWalls :: [Wall]}
 
 ----------------------------------------------------------------------------
 -- A wall is either a portal or a visible wall
+
 data Wall 
      = Portal Line Vector2D World 
      --  The vector is the Normal (pointing in whatever direction is into the world) 
      | Wall Line Int
+     -- The Int is an identifyer that points out what texture to use. 
             
 mkWall :: Point2D -> Point2D -> Int -> Wall             
 mkWall p1 p2 ident  = Wall (Line p1 p2) ident 
+
 mkPortal :: Point2D -> Point2D -> Vector2D -> World -> Wall 
 mkPortal p1 p2 v world = Portal (Line p1 p2) v world
             
-
-
-
-
 ----------------------------------------------------------------------------
 -- test 
 {- 
@@ -82,6 +81,14 @@ testWorld2 = World [mkPortal ( 0, 0) ( 0, 256) (-1,0) testWorld1,
 -}
 ----------------------------------------------------------------------------
 -- some constants
+
+{- 
+   Set up for a 60degree field of view. 
+   FOV = atan (windowWidth / viewDistance) 
+       = atan (windowWidth / windowWidth * 0.6) 
+       = atan (1 / 0.6)  
+       ~ 60degrees 
+-} 
 viewDistance   = floori_ (fromIntegral windowWidth * 0.6)  
 walkSpeed      = wallWidth `div` 16
 maxVisible     = 2048
@@ -112,7 +119,11 @@ data Slice = Slice {sliceTop :: Int32,
                     sliceBot :: Int32, 
                     sliceTex :: Int32,
                     sliceTexCol :: Int32,
-                    sliceIntensity :: Float}
+                    sliceIntensity :: Float,
+                    sliceDistance :: Float}
+-- Having sliceDistance and Top,Bot, Intensity is a bit redundant. 
+-- Top,Bot and Intensity can be computed from Distance.
+
 
 type Angle = Float 
 
@@ -120,22 +131,26 @@ type Angle = Float
 -- castRay
  
 castRay :: World -> Point2D -> Angle -> Int32 -> Slice 
-castRay world pos angle column = Slice top bot texValue texCol (min 1.0 (lightRadius/dist))  
+castRay world pos angle column = Slice top bot texValue texCol (min 1.0 (lightRadius/dist)) dist  
   where 
-    ray  = mkRay pos (angle - columnAngle)
-    columnAngle = atan $ fromIntegral col / fromIntegral viewDistance
+    ray = mkRay pos (angle - colAngle) 
+    col = column - viewportCenterX
+    colAngle = atan $ fromIntegral col / fromIntegral viewDistance
+    
     top  = bot - height 
     bot  = floori_ $ fromIntegral viewportCenterY + (fromIntegral height / 2) 
     height = floori_ $ fromIntegral (viewDistance * wallHeight) / dist
-    dist = dist' * cos columnAngle
-    col = column - viewportCenterX
+    
+    
+    dist = dist' * cos colAngle
+    
     (dist', texValue, texCol) = castRay2 world ray 
  
    
 
 
 ----------------------------------------------------------------------------
--- castRay2
+-- castRay2 (needs a better name) 
 
 
 
@@ -305,6 +320,33 @@ drawTransparent  tr surf (Rect x y w h)  =
       pf      = surfaceGetPixelFormat surf
       columns = surfaceGetWidth tr  
       rows    = surfaceGetHeight tr  
+
+-- With depth check (zbuffer)
+drawTransparentZ :: Surface -> Surface -> Rect -> Float -> [Float] -> IO ()                
+drawTransparentZ  tr surf (Rect x y w h) depth depths = 
+  do 
+    seeThrough <- mapRGB pf 255 0 255 
+    targPixels <- castPtr `fmap` surfaceGetPixels surf
+    srcPixels  <- castPtr `fmap` surfaceGetPixels tr 
+              
+                  
+    sequence_ [do 
+                  pixel <-  peekElemOff srcPixels (fromIntegral (floori_ (fromIntegral i*rx)+(fromIntegral columns)*floori_ (fromIntegral j *ry)))
+                  if ((Pixel pixel) /= seeThrough && depth < (depths !! (x+i)))  
+                  then pokeElemOff targPixels (start+(i+width*j)) (pixel :: Word32) 
+                  else return ()
+              | i <- [0..w-1] , j <- [0..h-1]] 
+                  
+    where 
+      rx      = (fromIntegral columns / fromIntegral w) 
+      ry      = (fromIntegral rows / fromIntegral h) 
+ 
+      start   = x + y * width 
+      width   = surfaceGetWidth surf
+      pf      = surfaceGetPixelFormat surf
+      columns = surfaceGetWidth tr  
+      rows    = surfaceGetHeight tr  
+
       
 
 ----------------------------------------------------------------------------
@@ -347,7 +389,7 @@ main = do
     initialTicks 
     0
     0.0
-    (-640,0) 
+    (0,0) 
     (False,False,False,False) -- Keyboard state
     (0.0,128 ,128)
   
@@ -383,7 +425,9 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
            pix
   
   -- draw all walls
-  renderWalls currWorld (x,y) r wallTextures screen
+  slices <- renderWalls currWorld (x,y) r wallTextures screen
+  
+  let dists  = map sliceDistance slices 
   
   -- Compute screen coordinates of monster based on its world coordinates. 
   -- TODO: Figure out how to do this.
@@ -402,12 +446,12 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
     then 
     do 
       let 
-        -- TODO: FIX  (clipping not correct)
+        -- TODO: clip line by line in the drawing routine
         mw = fromIntegral $ min 256 (floori_ (256*(fromIntegral viewDistance/mdist)))
         mh = fromIntegral $ min 256 (floori_ (256*(fromIntegral viewDistance/mdist)))
         projx' = (fromIntegral (floori_ projx)) - (mw `div` 2)
-      if (projx' > 0 && projx' < 800-(mw `div` 2))
-        then drawTransparent monster screen (Rect projx' (300-(mh `div` 2)) mw mh)
+      if (projx' > 0 && projx' < 800-mw)
+        then drawTransparentZ monster screen (Rect projx' (300-(mh `div` 2)) mw mh) mdist dists
         else return () 
     else return ()
          
