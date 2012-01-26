@@ -323,26 +323,50 @@ drawTransparent  tr surf (Rect x y w h)  =
 
 -- With depth check (zbuffer)
 drawTransparentZ :: Surface -> Surface -> Rect -> Float -> [Float] -> IO ()                
-drawTransparentZ  tr surf (Rect x y w h) depth depths = 
-  do 
-    seeThrough <- mapRGB pf 255 0 255 
-    targPixels <- castPtr `fmap` surfaceGetPixels surf
-    srcPixels  <- castPtr `fmap` surfaceGetPixels tr 
+drawTransparentZ  tr surf (Rect x y w h) depth depths 
+  | outside = return ()   
+  | otherwise = 
+    do 
+      seeThrough <- mapRGB pf 255 0 255 
+      targPixels <- castPtr `fmap` surfaceGetPixels surf
+      srcPixels  <- castPtr `fmap` surfaceGetPixels tr 
               
                   
-    sequence_ [do 
-                  pixel <-  peekElemOff srcPixels (fromIntegral (floori_ (fromIntegral i*rx)+(fromIntegral columns)*floori_ (fromIntegral j *ry)))
-                  if ((Pixel pixel) /= seeThrough && depth < (depths !! (x+i)))  
+      sequence_ [do 
+                  pixel <-  peekElemOff srcPixels (fromIntegral (floori_ (xJump+(fromIntegral i*rx)))+(fromIntegral columns)*fromIntegral (floori_ (yJump+(fromIntegral j *ry))))
+                  if ((Pixel pixel) /= seeThrough && depth < (depths !! (clippedX+i)))  
                   then pokeElemOff targPixels (start+(i+width*j)) (pixel :: Word32) 
                   else return ()
-              | i <- [0..w-1] , j <- [0..h-1]] 
+                | i <- [0..clippedW-1] , j <- [0..clippedH-1]] 
                   
     where 
       rx      = (fromIntegral columns / fromIntegral w) 
       ry      = (fromIntegral rows / fromIntegral h) 
+
+
+      -- if completely outside.  
+      outside = (x > width || y > height || 
+                 x < -w || y < -h)
  
-      start   = x + y * width 
+      clippedX = x1' -- if x < 0 then 0 else x 
+      clippedY = y1' -- if y < 0 then 0 else y
+ 
+      xJump    = rx * fromIntegral (clippedX - x) --how far to jump in texture
+      yJump    = ry * fromIntegral (clippedY - y)
+
+      (x1',y1') = (if x < 0 then 0 else x, if y < 0 then 0 else y) 
+      (x2',y2') = (if (x+w) >= width then width-1 else x+w, 
+                   if (y+h) >= height then height-1 else y+h) 
+
+      clippedW = x2'-x1'
+      clippedH = y2'-y1'
+
+
+
+      start   = clippedX + clippedY * width 
       width   = surfaceGetWidth surf
+      height  = surfaceGetHeight surf
+     
       pf      = surfaceGetPixelFormat surf
       columns = surfaceGetWidth tr  
       rows    = surfaceGetHeight tr  
@@ -438,6 +462,9 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
       monsterViewY = my' * cos (-r) + mx' * sin (-r) 
       a = monsterViewX*monsterViewX
       b = monsterViewY*monsterViewY
+      
+      -- distance will be slightly off when object is viewed in 
+      -- peripheral vision
       mdist = sqrt (a+b)
       
       projx = monsterViewX*fromIntegral viewDistance / mdist + 400
@@ -446,13 +473,11 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
     then 
     do 
       let 
-        -- TODO: clip line by line in the drawing routine
-        mw = fromIntegral $ min 256 (floori_ (256*(fromIntegral viewDistance/mdist)))
-        mh = fromIntegral $ min 256 (floori_ (256*(fromIntegral viewDistance/mdist)))
+        mw = fromIntegral $ floori_ (256*(fromIntegral viewDistance/mdist))
+        mh = fromIntegral $ floori_ (256*(fromIntegral viewDistance/mdist))
         projx' = (fromIntegral (floori_ projx)) - (mw `div` 2)
-      if (projx' > 0 && projx' < 800-mw)
-        then drawTransparentZ monster screen (Rect projx' (300-(mh `div` 2)) mw mh) mdist dists
-        else return () 
+      drawTransparentZ monster screen (Rect projx' (300-(mh `div` 2)) mw mh) mdist dists
+   
     else return ()
          
   ticks2 <- getTicks 
@@ -460,7 +485,7 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
                       then (ticks2,fromIntegral frames / (fromIntegral ticks' / 1000))
                       else (1,fps)     
                            
-                           
+{-                            
  --  renderMsg fnt ("FPS: " ++ show fps') (0,0) screen                          
   -- Causes segfault!  
   txt <- renderTextSolid fnt ("FPS: " ++ show fps') (Color 255 255 255) 
@@ -487,7 +512,7 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
   freeSurface txt4
   freeSurface txt5
   freeSurface txt6
-   
+-}   
 
   SDL.flip screen
   
