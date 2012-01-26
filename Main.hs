@@ -323,10 +323,12 @@ drawTransparent  tr surf (Rect x y w h)  =
 
 ----------------------------------------------------------------------------
 -- drawTransparentZ with z buffer check and clipping 
--- TODO: Write this fun in C (and compare performance) 
+-- TODO: Write this fun in C (and compare performance)
+--       - will it be problematic to pass the depths list to C world (inefficient?) 
+--       - store the depths not in a list then ?  
 drawTransparentZ :: Surface -> Surface -> Rect -> Float -> [Float] -> IO ()                
 drawTransparentZ  tr surf (Rect x y w h) depth depths 
-  | outside = return ()   
+  | outside = return () -- sprite is completely outside of target surface  
   | otherwise = 
     do 
       seeThrough <- mapRGB pf 255 0 255 
@@ -335,7 +337,14 @@ drawTransparentZ  tr surf (Rect x y w h) depth depths
               
                   
       sequence_ [do 
-                  pixel <-  peekElemOff srcPixels (fromIntegral (floori_ (xJump+(fromIntegral i*rx)))+(fromIntegral columns)*fromIntegral (floori_ (yJump+(fromIntegral j *ry))))
+                  pixel <- peekElemOff srcPixels 
+                                       (fromIntegral (floori_ (xJump+(fromIntegral i*rx)))+
+                                        (fromIntegral columns)*
+                                        fromIntegral (floori_ (yJump+(fromIntegral j *ry))))
+                                       
+                  -- how bad is it to use a depths list (lookups are linear                      
+                  -- but there are only a maximum of viewportWidth lookups per frame.
+                  -- Probably bad anyway
                   if ((Pixel pixel) /= seeThrough && depth < (depths !! (clippedX+i)))  
                   then pokeElemOff targPixels (start+(i+width*j)) (pixel :: Word32) 
                   else return ()
@@ -350,8 +359,8 @@ drawTransparentZ  tr surf (Rect x y w h) depth depths
       outside = (x > width || y > height || 
                  x < -w || y < -h)
  
-      clippedX = x1' -- if x < 0 then 0 else x 
-      clippedY = y1' -- if y < 0 then 0 else y
+      clippedX = x1' 
+      clippedY = y1' 
  
       xJump    = rx * fromIntegral (clippedX - x) --how far to jump in texture
       yJump    = ry * fromIntegral (clippedY - y)
@@ -376,7 +385,7 @@ drawTransparentZ  tr surf (Rect x y w h) depth depths
       
 
 ----------------------------------------------------------------------------
--- 
+-- TODO
 
 data GameState = GameState 
 
@@ -456,17 +465,17 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
   let dists  = map sliceDistance slices 
   
   -- Compute screen coordinates of monster based on its world coordinates. 
-  -- TODO: Figure out how to do this.
+  -- DONE: Figure out how to do this.
+  -- TODO: Break out into a function    
   let mx' = (mx-x) 
       my' = (my-y)  
             
       monsterViewX = mx' * cos (-r) - my' * sin (-r)
       monsterViewY = my' * cos (-r) + mx' * sin (-r) 
+      
+      -- 
       a = monsterViewX*monsterViewX
       b = monsterViewY*monsterViewY
-      
-      -- distance will be slightly off when object is viewed in 
-      -- peripheral vision
       mdist = sqrt (a+b)
       
       
@@ -475,8 +484,8 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
     then 
     do 
       let 
-        mw = fromIntegral $ floori_ (256*(fromIntegral viewDistance/mdist))
-        mh = fromIntegral $ floori_ (256*(fromIntegral viewDistance/mdist))
+        mw = fromIntegral $ floori_ (256*(fromIntegral viewDistance/ mdist))
+        mh = fromIntegral $ floori_ (256*(fromIntegral viewDistance/ mdist))
         projx = monsterViewX*fromIntegral viewDistance / monsterViewY  
                 
         projx_ = (fromIntegral (floori_ projx)) + (400 - (mw `div` 2))
