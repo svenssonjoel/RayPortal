@@ -321,7 +321,9 @@ drawTransparent  tr surf (Rect x y w h)  =
       columns = surfaceGetWidth tr  
       rows    = surfaceGetHeight tr  
 
--- With depth check (zbuffer)
+----------------------------------------------------------------------------
+-- drawTransparentZ with z buffer check and clipping 
+-- TODO: Write this fun in C (and compare performance) 
 drawTransparentZ :: Surface -> Surface -> Rect -> Float -> [Float] -> IO ()                
 drawTransparentZ  tr surf (Rect x y w h) depth depths 
   | outside = return ()   
@@ -467,7 +469,7 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
       -- peripheral vision
       mdist = sqrt (a+b)
       
-      projx = monsterViewX*fromIntegral viewDistance / mdist + 400
+      
   
   if ( monsterViewY >= 0) 
     then 
@@ -475,8 +477,10 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
       let 
         mw = fromIntegral $ floori_ (256*(fromIntegral viewDistance/mdist))
         mh = fromIntegral $ floori_ (256*(fromIntegral viewDistance/mdist))
-        projx' = (fromIntegral (floori_ projx)) - (mw `div` 2)
-      drawTransparentZ monster screen (Rect projx' (300-(mh `div` 2)) mw mh) mdist dists
+        projx = monsterViewX*fromIntegral viewDistance / monsterViewY  
+                
+        projx_ = (fromIntegral (floori_ projx)) + (400 - (mw `div` 2))
+      drawTransparentZ monster screen (Rect projx_ (300-(mh `div` 2)) mw mh) mdist dists
    
     else return ()
          
