@@ -382,11 +382,17 @@ drawTransparentZ  tr surf (Rect x y w h) depth depths
       columns = surfaceGetWidth tr  
       rows    = surfaceGetHeight tr  
 
-      
+----------------------------------------------------------------------------
+-- sprites (moving and stationary objects)  
+data Sprite = Sprite { spritePos       :: Point2D,      -- world x,y pos 
+                       spriteElevation :: Float,        -- height above ground (z) 
+                       spriteDims      :: (Float,Float),-- Base size  
+                       spriteTexture   :: Surface}
+                       
+
 
 ----------------------------------------------------------------------------
 -- TODO
-
 data GameState = GameState 
 
 type GS = S.StateT GameState IO           
@@ -504,7 +510,7 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
   txt <- renderTextSolid fnt ("FPS: " ++ show fps') (Color 255 255 255) 
   txt1 <- renderTextSolid fnt ("pos: " ++ show (x,y)) (Color 255 255 255)  
   txt2 <- renderTextSolid fnt ("mpos: " ++ show (monsterViewX,monsterViewY)) (Color 255 255 255)  
-  txt3 <- renderTextSolid fnt ("mprojx: " ++ show projx) (Color 255 255 255)  
+  --txt3 <- renderTextSolid fnt ("mprojx: " ++ show projx) (Color 255 255 255)  
   txt4 <- renderTextSolid fnt ("morig: " ++ show (mx,my)) (Color 255 255 255)  
   txt5 <- renderTextSolid fnt ("mtrans: " ++ show (mx',my')) (Color 255 255 255)  
   txt6 <- renderTextSolid fnt ("radians: " ++ show r) (Color 255 255 255)  
@@ -514,18 +520,18 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
   blitSurface txt Nothing screen Nothing
   blitSurface txt1 Nothing screen (Just (Rect 0 15 800 600))
   blitSurface txt2 Nothing screen (Just (Rect 0 30 800 600))
-  blitSurface txt3 Nothing screen (Just (Rect 0 45 800 600))
+  --blitSurface txt3 Nothing screen (Just (Rect 0 45 800 600))
   blitSurface txt4 Nothing screen (Just (Rect 0 60 800 600))
   blitSurface txt5 Nothing screen (Just (Rect 0 75 800 600))
   blitSurface txt6 Nothing screen (Just (Rect 0 100 800 600))
   freeSurface txt
   freeSurface txt1
   freeSurface txt2
-  freeSurface txt3
+  --freeSurface txt3
   freeSurface txt4
   freeSurface txt5
   freeSurface txt6
--}   
+ -}  
 
   SDL.flip screen
   
