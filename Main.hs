@@ -506,6 +506,30 @@ gsUpdateArrowKeys f =
     S.put $ gs { gsKeyState = arrowKeys' } 
     return arrowKeys'
     
+    
+gsUpdateArrowKeys' e = gsUpdateArrowKeys (\ars -> f ars )      
+   
+  where  
+    f (ArrowKeys up down left right) = 
+        case e of 
+          (KeyDown k) -> 
+            case (symKey k) of 
+              SDLK_LEFT    -> ArrowKeys up down True right
+              SDLK_RIGHT   -> ArrowKeys up down left True 
+              SDLK_UP      -> ArrowKeys True down left right 
+              SDLK_DOWN    -> ArrowKeys up True left right 
+              SDLK_ESCAPE  -> ArrowKeys up down left right 
+              otherwise    -> ArrowKeys up down left right 
+          (KeyUp k) -> 
+            case (symKey k) of 
+              SDLK_LEFT  -> ArrowKeys up down False right 
+              SDLK_RIGHT -> ArrowKeys up down left False 
+              SDLK_UP    -> ArrowKeys False down left right 
+              SDLK_DOWN  -> ArrowKeys up False left right 
+              otherwise  -> ArrowKeys up down left right 
+            -- Quit -> (up,down,left,right) 
+          otherwise -> ArrowKeys up down left right 
+    
 gsUpdateViewAngle :: (Float -> Float) -> GS Float 
 gsUpdateViewAngle f = 
   do 
@@ -658,27 +682,14 @@ eventLoop = do
   -- process events 
   e <- S.lift pollEvent
   
-  ArrowKeys  up down left right <- gsUpdateArrowKeys id
+  -- Handle arrowkey presses
+  ArrowKeys  up' down' left' right' <- gsUpdateArrowKeys' e 
   
-  let (up',down',left',right',b) = 
-        case e of 
-          (KeyDown k) -> 
-            case (symKey k) of 
-              SDLK_LEFT    -> (up,down,True,right,False)
-              SDLK_RIGHT   -> (up,down,left,True,False)
-              SDLK_UP      -> (True,down,left,right,False)
-              SDLK_DOWN    -> (up,True,left,right,False)
-              SDLK_ESCAPE  -> (up,down,left,right,True)
-              otherwise    -> (up,down,left,right,False)
-          (KeyUp k) -> 
-            case (symKey k) of 
-              SDLK_LEFT  -> (up,down,False,right,False)
-              SDLK_RIGHT -> (up,down,left,False,False)
-              SDLK_UP    -> (False,down,left,right,False)
-              SDLK_DOWN  -> (up,False,left,right,False)
-              otherwise  -> (up,down,left,right,False)
-          Quit -> (up,down,left,right,True) 
-          otherwise -> (up,down,left,right,False)
+  -- Handle the escape key
+  let b = case e of 
+            (KeyDown k) -> symKey k == SDLK_ESCAPE 
+            otherwise -> False
+   
   let (r',x',y') = (moveLeft left' . moveRight right' . moveUp up' . moveDown down') (r,x,y)         
           
   let portals       = filter isPortal (worldWalls currWorld)
