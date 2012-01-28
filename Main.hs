@@ -16,6 +16,7 @@ import Data.Word
 import Data.Int
 import Data.List hiding (intersect)
 import Data.Maybe
+import Data.Array
 
 import CExtras
 import MathExtras
@@ -334,7 +335,9 @@ drawTransparentZ  tr surf (Rect x y w h) depth depths
       seeThrough <- mapRGB pf 255 0 255 
       targPixels <- castPtr `fmap` surfaceGetPixels surf
       srcPixels  <- castPtr `fmap` surfaceGetPixels tr 
-              
+      
+      -- No visible improvement in speed.
+      let depthsArr = listArray (0,length depths-1) depths        
                   
       sequence_ [do 
                   pixel <- peekElemOff srcPixels 
@@ -345,7 +348,7 @@ drawTransparentZ  tr surf (Rect x y w h) depth depths
                   -- how bad is it to use a depths list (lookups are linear                      
                   -- but there are only a maximum of viewportWidth lookups per frame.
                   -- Probably bad anyway
-                  if ((Pixel pixel) /= seeThrough && depth < (depths !! (clippedX+i)))  
+                  if ((Pixel pixel) /= seeThrough && depth < (depthsArr ! (clippedX+i)))  
                   then pokeElemOff targPixels (start+(i+width*j)) (pixel :: Word32) 
                   else return ()
                 | i <- [0..clippedW-1] , j <- [0..clippedH-1]] 
