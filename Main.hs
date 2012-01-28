@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-
    Another RayCasting experiment. 
 
@@ -58,6 +59,7 @@ testWorld1 = World [mkWall (-512,-512) (-512, 512) 1,
                     mkWall ( 512,-512) (-512,-512) 4]
 
 -}
+{- 
 testWorld1 = World [mkWall (-512,-512) (-512,-128) 1, 
                     mkWall (-512,-128) (-640, 0)   1, 
                     mkWall (-640, 0  ) (-512, 128) 1,  
@@ -66,8 +68,8 @@ testWorld1 = World [mkWall (-512,-512) (-512,-128) 1,
                     mkWall (-512, 512) ( 512, 512) 2,
                     mkWall ( 512, 512) ( 512,-512) 3, 
                     mkWall ( 512,-512) (-512,-512) 4]
+-}
 
-{-
 testWorld1 = World [mkPortal ( 0, 0) ( 0, 256) (1,0) testWorld2, 
                     mkWall   ( 0, 256) ( 256, 256) 2,
                     mkWall   ( 256, 256) ( 256, 0) 3, 
@@ -79,7 +81,7 @@ testWorld2 = World [mkPortal ( 0, 0) ( 0, 256) (-1,0) testWorld1,
                     mkWall   ( 0, 256) (-512, 256) 5,
                     mkWall   (-512, 256) (-512, 0) 6,
                     mkWall   (-512, 0) ( 0, 0) 7]
--}
+
 ----------------------------------------------------------------------------
 -- some constants
 
@@ -386,7 +388,7 @@ drawTransparentZ  tr surf (Rect x y w h) depth depths
       rows    = surfaceGetHeight tr  
 
 ----------------------------------------------------------------------------
--- sprites (moving  
+-- sprites (a movable or stationary object in the 2world) 
 data Sprite = Sprite { spritePos       :: Point2D,      -- world x,y pos 
                        spriteElevation :: Float,        -- height above ground (z) 
                        spriteDims      :: (Float,Float),-- Base size  
@@ -394,23 +396,137 @@ data Sprite = Sprite { spritePos       :: Point2D,      -- world x,y pos
                        
 
 -- transform a world object into a screen object. 
--- (maybe a screen object? it may be completely outside.. early clip)  
-viewTransformSprite :: Point2D -> Float -> Sprite -> RItem
-viewTransformSprite = undefined 
-
-data RItem = RItem { rItemPos :: (Int,Int), -- position on screen
+-- ignoring elevation from floor currently. 
+viewTransformSprite :: Point2D -> Float -> Sprite -> Maybe RItem
+viewTransformSprite viewPos viewAngle spr  
+  | ry >= 0 =
+    Just $ RItem (projx_,viewportCenterY-(mh `div` 2)) 
+                 (mw,mh) 
+                 (spriteTexture spr) 
+                 dist
+  | otherwise = Nothing 
+          
+  where 
+    (mx,my) = spritePos spr `vecSub` viewPos 
+    rx      = mx * cos (-viewAngle) - my * sin (-viewAngle) 
+    ry      = my * cos (-viewAngle) + mx * sin (-viewAngle) 
+    
+    dist    = sqrt (rx*rx+ry*ry)
+    
+    mw = fromIntegral $ floori_ (256*(fromIntegral viewDistance/ dist))
+    mh = fromIntegral $ floori_ (256*(fromIntegral viewDistance/ dist))
+    projx = rx * fromIntegral viewDistance / ry  
+                
+    projx_ = (fromIntegral (floori_ projx)) + (viewportCenterX - (mw `div` 2))    
+    
+-- An objected projected onto screen 
+data RItem = RItem { rItemPos  :: (Int32,Int32), -- position on screen
+                     rItemDims :: (Int32,Int32),
                      rItemTexture :: Surface, 
-                     -- rItemDims    :: (Int,Int) -- get from surface
                      rItemDepth   :: Float} -- distance from Viewer (used for clipping against walls) 
                      
                        
-
+renderRItem :: Surface -> [Float] -> RItem -> IO () 
+renderRItem surf dists ritem= 
+  drawTransparentZ (rItemTexture ritem) 
+                   surf 
+                   (Rect x y w h) dist dists
+  where 
+    x = fromIntegral$ fst $ rItemPos ritem                 
+    y = fromIntegral$ snd $ rItemPos ritem 
+    w = fromIntegral$ fst $ rItemDims ritem
+    h = fromIntegral$ snd $ rItemDims ritem
+    dist = rItemDepth ritem 
+    
+    
 
 ----------------------------------------------------------------------------
 -- TODO
-data GameState = GameState 
+    
+data FPSCalc = FPSCalc {fpsCalcTicks  :: Word32,  
+                        fpsCalcFrames :: Int32, 
+                        fpsCalcFPS    :: Float} 
+    
+data ArrowKeys = ArrowKeys {arrowKeyUp    :: Bool,                
+                            arrowKeyDown  :: Bool,  
+                            arrowKeyLeft  :: Bool, 
+                            arrowKeyRight :: Bool} 
+               
+data GameState = GameState {gsTarget :: Surface,
+                            gsWallTextures :: [Surface], 
+                            gsSprite :: Sprite, 
+                            gsWorld  :: World,
+                            gsFont   :: Font, 
+                            gsFPS    :: FPSCalc, 
+                            gsKeyState :: ArrowKeys, 
+                            gsViewAngle :: Float,
+                            gsViewPos   :: Point2D}
+                                                       
+type GS a = S.StateT GameState IO a           
 
-type GS = S.StateT GameState IO           
+gsGetTarget :: GS Surface 
+gsGetTarget = S.gets gsTarget  
+
+gsGetWallTextures :: GS [Surface] 
+gsGetWallTextures = S.gets gsWallTextures 
+
+gsGetWorld :: GS World
+gsGetWorld = S.gets gsWorld
+
+gsUpdateWorld :: (World -> World) -> GS World 
+gsUpdateWorld f = 
+  do 
+    gs <- S.get 
+    let w = gsWorld gs
+        w' = f w 
+    S.put $ gs { gsWorld = w' } 
+    return w'
+  
+
+gsGetSprite :: GS Sprite
+gsGetSprite = S.gets gsSprite  
+
+gsGetFont :: GS Font
+gsGetFont   = S.gets gsFont 
+
+gsGetFPS :: GS Float
+gsGetFPS    = do 
+  fpsCalc <- S.gets gsFPS 
+  return $ fpsCalcFPS fpsCalc
+  
+gsUpdateFPS :: (FPSCalc -> FPSCalc) -> GS () 
+gsUpdateFPS f = S.modify (\gs -> gs {gsFPS = (f . gsFPS) gs})
+  
+  
+gsUpdateArrowKeys :: (ArrowKeys -> ArrowKeys) -> GS ArrowKeys
+gsUpdateArrowKeys f = 
+  do 
+    gs <- S.get 
+    let arrowKeys = gsKeyState gs
+        arrowKeys' = f arrowKeys 
+    S.put $ gs { gsKeyState = arrowKeys' } 
+    return arrowKeys'
+    
+gsUpdateViewAngle :: (Float -> Float) -> GS Float 
+gsUpdateViewAngle f = 
+  do 
+    gs <- S.get 
+    let r = gsViewAngle gs
+        r' = f r 
+    S.put $ gs { gsViewAngle = r' } 
+    return r'
+                          
+gsUpdateViewPos :: (Point2D -> Point2D) -> GS Point2D 
+gsUpdateViewPos f =  
+  do
+    gs <- S.get 
+    let p = gsViewPos gs
+        p' = f p
+    S.put $ gs { gsViewPos = p' } 
+    return p'
+   
+  
+  
 
 ----------------------------------------------------------------------------
 -- Main !
@@ -436,26 +552,23 @@ main = do
                  
   
   monster <- conv pf =<< loadBMP "Data/eye1.bmp"  
-  
-  -- testSprite. 
   let monsterSprite = Sprite (0,0)
                              0
                              (256,256) 
                              monster 
-
+   
 
   initialTicks <- getTicks
-  eventLoop screen wallTextures -- testTexture floorTex
-    monster 
-    testWorld1 
-    fnt
-    initialTicks 
-    0
-    0.0
-    (0,0) 
-    (False,False,False,False) -- Keyboard state
-    (0.0,128 ,128)
-  
+  S.evalStateT  eventLoop $ GameState screen 
+                                       wallTextures 
+                                       monsterSprite 
+                                       testWorld1 
+                                       fnt
+                                       (FPSCalc initialTicks 0 0.0)
+                                       (ArrowKeys False False False False) -- Keyboard state
+                                       0.0
+                                       (128 ,128)
+                                       
   FONT.quit
   SDL.quit
   
@@ -464,72 +577,53 @@ main = do
   
 ----------------------------------------------------------------------------
 -- process events and draw graphics 
-eventLoop :: Surface 
-             -> [Surface] 
-             -> Surface
-             -> World
-             -> Font
-             -> Word32
-             -> Int32
-             -> Float
-             -> (Float,Float) -- monster location 
-             -> (Bool,Bool,Bool,Bool) 
-             -> (Float,Float, Float) 
-             -> IO ()
-eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up,down,left,right) (r,x,y) = do 
+--eventLoop :: Surface      -- screen
+--             -> [Surface] -- wallTextures
+--             -> Sprite    -- monster 
+--             -> World     -- currWorld
+--             -> Font      -- font
+--             -> Word32    -- ticks
+--             -> Int32     -- frames 
+--             -> Float     -- fps 
+--             -> (Bool,Bool,Bool,Bool) -- KeyboardState 
+--             -> (Float,Float,Float)   -- Angle and position 
+--             -> IO ()
+--eventLoop screen wallTextures monster currWorld fnt ticks frames fps (up,down,left,right) (r,x,y) = do 
+eventLoop :: GS ()   
+eventLoop = do 
+  pf <- surfaceGetPixelFormat `fmap` gsGetTarget 
   
-  let pf = surfaceGetPixelFormat screen
+  pix <- S.lift $ mapRGB pf 16 16 16 
   
-  pix <- mapRGB pf 16 16 16 
+  -- Improve on this 
+  screen <- gsGetTarget
+  currWorld <- gsGetWorld
+  wallTextures <- gsGetWallTextures
+  (x,y) <- gsUpdateViewPos id 
+  r     <- gsUpdateViewAngle id 
+  monster <- gsGetSprite 
+  fnt <- gsGetFont
   
   -- Clear screen
-  fillRect screen 
-           (Just (Rect 0 0 (fromIntegral windowWidth) (fromIntegral windowHeight))) 
-           pix
+  S.lift $ fillRect screen 
+                    (Just (Rect 0 0 (fromIntegral windowWidth) (fromIntegral windowHeight))) 
+                    pix
   
   -- draw all walls
-  slices <- renderWalls currWorld (x,y) r wallTextures screen
+  
+  slices <- S.lift $ renderWalls currWorld (x,y) r wallTextures screen
   
   let dists  = map sliceDistance slices 
   
-  -- Compute screen coordinates of monster based on its world coordinates. 
-  -- DONE: Figure out how to do this.
-  -- TODO: Break out into a function    
-      
-  -- let monsterSpriteTrans = viewTransformSprite monsterSprite (x,y) r  
-  -- renderSprite monsterSprite screen
-   
-  let mx' = (mx-x) 
-      my' = (my-y)  
-            
-      monsterViewX = mx' * cos (-r) - my' * sin (-r)
-      monsterViewY = my' * cos (-r) + mx' * sin (-r) 
-      
-      -- 
-      a = monsterViewX*monsterViewX
-      b = monsterViewY*monsterViewY
-      mdist = sqrt (a+b)
-      
-      
-  
-  if ( monsterViewY >= 0) 
-    then 
-    do 
-      let 
-        mw = fromIntegral $ floori_ (256*(fromIntegral viewDistance/ mdist))
-        mh = fromIntegral $ floori_ (256*(fromIntegral viewDistance/ mdist))
-        projx = monsterViewX*fromIntegral viewDistance / monsterViewY  
-                
-        projx_ = (fromIntegral (floori_ projx)) + (400 - (mw `div` 2))
-      drawTransparentZ monster screen (Rect projx_ (300-(mh `div` 2)) mw mh) mdist dists
-   
-    else return ()
-         
-
-  ticks2 <- getTicks 
-  let (ticks',fps') = if ( ticks2 - ticks >= 1000)                            
-                      then (ticks2,fromIntegral frames / (fromIntegral ticks' / 1000))
-                      else (1,fps)     
+  -- testSprite. 
+                             
+  let monsterTfrmd = viewTransformSprite (x,y) r monster
+  S.lift$ maybe (return ()) (renderRItem screen dists) monsterTfrmd
+ 
+  --ticks2 <- getTicks 
+  --let (ticks',fps') = if ( ticks2 - ticks >= 1000)                            
+  --                    then (ticks2,fromIntegral frames / (fromIntegral ticks' / 1000))
+  --                   else (1,fps)     
                            
 {-                            
  --  renderMsg fnt ("FPS: " ++ show fps') (0,0) screen                          
@@ -560,12 +654,12 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
   freeSurface txt6
  -}  
 
-  SDL.flip screen
+  S.lift$ SDL.flip screen
   
   -- process events 
-  e <- pollEvent
+  e <- S.lift pollEvent
   
-  
+  ArrowKeys  up down left right <- gsUpdateArrowKeys id
   
   let (up',down',left',right',b) = 
         case e of 
@@ -596,7 +690,14 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
           [(Portal _ _ world')] -> world'
           _ -> error "what!"
       
-  unless b $ eventLoop screen wallTextures monster currWorld' fnt ticks' (frames+1) fps' (mx,my) (up',down',left',right') (r',x',y')     
+  -- FIX FIX FIX     
+  gsUpdateViewPos (\_ -> (x',y')) 
+  gsUpdateViewAngle (\_ -> r') 
+  gsUpdateArrowKeys (\_ -> (ArrowKeys up' down' left' right'))
+  gsUpdateWorld (\_ -> currWorld')     
+      
+  -- if not exit, loop.    
+  unless b $ eventLoop 
   
   where 
     
