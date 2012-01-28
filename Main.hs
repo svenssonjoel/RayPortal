@@ -386,11 +386,23 @@ drawTransparentZ  tr surf (Rect x y w h) depth depths
       rows    = surfaceGetHeight tr  
 
 ----------------------------------------------------------------------------
--- sprites (moving and stationary objects)  
+-- sprites (moving  
 data Sprite = Sprite { spritePos       :: Point2D,      -- world x,y pos 
                        spriteElevation :: Float,        -- height above ground (z) 
                        spriteDims      :: (Float,Float),-- Base size  
                        spriteTexture   :: Surface}
+                       
+
+-- transform a world object into a screen object. 
+-- (maybe a screen object? it may be completely outside.. early clip)  
+viewTransformSprite :: Point2D -> Float -> Sprite -> RItem
+viewTransformSprite = undefined 
+
+data RItem = RItem { rItemPos :: (Int,Int), -- position on screen
+                     rItemTexture :: Surface, 
+                     -- rItemDims    :: (Int,Int) -- get from surface
+                     rItemDepth   :: Float} -- distance from Viewer (used for clipping against walls) 
+                     
                        
 
 
@@ -424,6 +436,13 @@ main = do
                  
   
   monster <- conv pf =<< loadBMP "Data/eye1.bmp"  
+  
+  -- testSprite. 
+  let monsterSprite = Sprite (0,0)
+                             0
+                             (256,256) 
+                             monster 
+
 
   initialTicks <- getTicks
   eventLoop screen wallTextures -- testTexture floorTex
@@ -476,6 +495,10 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
   -- Compute screen coordinates of monster based on its world coordinates. 
   -- DONE: Figure out how to do this.
   -- TODO: Break out into a function    
+      
+  -- let monsterSpriteTrans = viewTransformSprite monsterSprite (x,y) r  
+  -- renderSprite monsterSprite screen
+   
   let mx' = (mx-x) 
       my' = (my-y)  
             
@@ -502,6 +525,7 @@ eventLoop screen wallTextures monster currWorld fnt ticks frames fps (mx,my) (up
    
     else return ()
          
+
   ticks2 <- getTicks 
   let (ticks',fps') = if ( ticks2 - ticks >= 1000)                            
                       then (ticks2,fromIntegral frames / (fromIntegral ticks' / 1000))
