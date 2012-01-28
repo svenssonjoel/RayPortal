@@ -1,4 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
 {-
    Another RayCasting experiment. 
 
@@ -59,7 +58,7 @@ testWorld1 = World [mkWall (-512,-512) (-512, 512) 1,
                     mkWall ( 512,-512) (-512,-512) 4]
 
 -}
-{- 
+
 testWorld1 = World [mkWall (-512,-512) (-512,-128) 1, 
                     mkWall (-512,-128) (-640, 0)   1, 
                     mkWall (-640, 0  ) (-512, 128) 1,  
@@ -68,7 +67,7 @@ testWorld1 = World [mkWall (-512,-512) (-512,-128) 1,
                     mkWall (-512, 512) ( 512, 512) 2,
                     mkWall ( 512, 512) ( 512,-512) 3, 
                     mkWall ( 512,-512) (-512,-512) 4]
--}
+{- 
 
 testWorld1 = World [mkPortal ( 0, 0) ( 0, 256) (1,0) testWorld2, 
                     mkWall   ( 0, 256) ( 256, 256) 2,
@@ -81,7 +80,7 @@ testWorld2 = World [mkPortal ( 0, 0) ( 0, 256) (-1,0) testWorld1,
                     mkWall   ( 0, 256) (-512, 256) 5,
                     mkWall   (-512, 256) (-512, 0) 6,
                     mkWall   (-512, 0) ( 0, 0) 7]
-
+-}
 ----------------------------------------------------------------------------
 -- some constants
 
