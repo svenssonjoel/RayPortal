@@ -154,8 +154,6 @@ castRay world pos angle column = Slice top bot texValue texCol (min 1.0 (lightRa
 ----------------------------------------------------------------------------
 -- castRay2 (needs a better name) 
 
-
-
 wallIntersect :: Ray -> Wall -> Maybe Point2D    
 wallIntersect ray (Wall line id)  = intersect ray line   
 wallIntersect ray (Portal line v _) = if (vecDot (rayDeltas ray) v <= 0.0) 
